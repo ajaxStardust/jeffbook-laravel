@@ -18,7 +18,7 @@ For deployment head over to the [Laravel Doc's](https://laravel.com/docs/8.x/dep
 
 ```bash
 # Clone the repository
-git clone https://github.com/michitheonlyone/refbook-laravel.git
+git clone https://github.com/ajaxStardust/jeffbook-laravel.git
 
 # Install composer and npm dependencies
 composer install
