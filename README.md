@@ -1,3 +1,6 @@
+# THIS IS A FORK OF
+Fixed a minor issue with the fonts (not showing in the editor). Basically fixed it so it doesn't require `artisan serve`. 
+_Cheers!_ 
 # Reference Book App
 ** Laravel tutorial project **
 https://www.youtube.com/watch?v=MFh0Fd7BsjE
