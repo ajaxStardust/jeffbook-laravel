@@ -2,118 +2,75 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use App\Models\Category;
+use App\Models\Post;
 
 class CategoryController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index($category)
+    // Show posts in a category (public)
+    public function index(Category $category)
     {
-        if ($category = Category::where('slug',$category)->first()) {
-            // $posts = $category->posts();
-            // dd($category->posts);
-            return  view('category')->with('category', $category);
-        } else {
-            return abort(404);
-        }
+        $category->load('posts'); // eager load posts
+
+        return view('category', compact('category'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
+    // Show form to create a new category
     public function create()
     {
-        return view('categoryform')->with(['formtitle' => 'New Category']);
+        return view('categoryform');
     }
 
-    private function _slugit($string)
-    {
-        $temp = Str::slug($string, '-');
-        // search for existing slug
-        if (Category::where('slug', $temp)->first()) {
-            $count = 1;
-            $slug = $temp."-".$count;
-            while (Category::where('slug', $slug)->first()) {
-                $count++;
-                $slug = $temp."-".$count;
-            }
-            // dd($slug);
-            return $slug;
-        } else {
-            return $temp;
-        }
-    }
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
+    // Store a new category
     public function store(Request $request)
     {
-        $this->validate($request, [
-            'name' => 'required'
+        $data = $request->validate([
+            'name'        => 'required|string',
+            'slug'        => 'required|string|unique:categories,slug',
+            'description' => 'nullable|string',
         ]);
 
-        Category::create([
-            'name' => $request->name,
-            'slug' => $this->_slugit($request->name),
-            'description' => $request->description
-        ]);
+        Category::create($data);
 
-        return redirect('/'); // to the category road
+        return redirect('/')
+            ->with('success', 'Category created.');
     }
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Category  $category
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Category $category)
+    // Delete a category safely
+    public function destroy(Request $request, Category $category)
     {
-        //
-    }
+        $postsCount = $category->posts()->count();
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Category  $category
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Category $category)
-    {
-        //
-    }
+        if ($postsCount > 0) {
+            // Rule #1: Reassign posts if requested
+            if ($request->filled('reassign_to')) {
+                $newCategoryId = $request->input('reassign_to');
+                $newCategory = Category::find($newCategoryId);
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Category  $category
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, Category $category)
-    {
-        //
-    }
+                if (!$newCategory) {
+                    return back()->withErrors('Selected category for reassignment does not exist.');
+                }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Category  $category
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy(Category $category)
-    {
-        //
+                // Reassign posts
+                Post::where('category_id', $category->id)
+                    ->update(['category_id' => $newCategory->id]);
+
+                // Then delete
+                $category->delete();
+
+                return redirect('/')
+                    ->with('success', "Category deleted and posts reassigned to '{$newCategory->name}'.");
+            }
+
+            // Rule #2: Prevent deletion if no reassignment
+            return back()->withErrors("Category '{$category->name}' cannot be deleted while it contains posts. Reassign them first.");
+        }
+
+        // No posts, safe to delete
+        $category->delete();
+
+        return redirect('/')
+            ->with('success', "Category '{$category->name}' deleted successfully.");
     }
 }

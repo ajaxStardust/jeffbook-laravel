@@ -1,0 +1,25 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+
+return [
+    [
+        'name' => 'Run PHP Script',
+        'type' => 'php',
+        'request' => 'launch',
+        'program' => '${workspaceFolder}/artisan', // or any PHP script
+        'args' => ['serve'],                        // optional args
+        'cwd' => '${workspaceFolder}',
+        'port' => 9003,                             // Xdebug port
+        'stopOnEntry' => false,
+    ],
+    [
+        'name' => 'Listen for Xdebug',
+        'type' => 'php',
+        'request' => 'launch',
+        'cwd' => '${workspaceFolder}',
+        'port' => 9003,
+        'stopOnEntry' => false,
+    ],
+];

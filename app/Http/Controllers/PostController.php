@@ -2,152 +2,123 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
-use App\Models\Post;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use App\Models\Post;
+use App\Models\Category;
 
 class PostController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index($categoryslug, $postslug)
+    // Show a single post
+    public function show(Category $category, $postslug)
     {
-        // get the data
-        if ($post = Post::where('slug', $postslug)->first()) {
-            // render the View
-            return view('post')
-                ->with(['categoryslug' => $categoryslug])
-                ->with(['postslug' => $postslug])
-                ->with('post', $post);
-        } else {
-            return abort(404);
-        }
+        // Ensure post is in this category
+        $post = Post::where("slug", $postslug)
+            ->where("category_id", $category->id)
+            ->firstOrFail();
+
+        return view("post", compact("post", "category"));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create($cat = 'uncategorized')
+    // Show form to edit existing post
+    public function edit(Category $category, $postslug)
+    {
+        $post = Post::where("slug", $postslug)
+            ->where("category_id", $category->id)
+            ->firstOrFail();
+
+        $categories = Category::all();
+
+        return view("postform", compact("post", "categories", "category"));
+    }
+
+    // List all posts (optional)
+    public function index()
+    {
+        $posts = Post::all();
+        return view("posts.index", compact("posts"));
+    }
+
+    // Show form to create new post
+    public function create(Category $category)
     {
         $categories = Category::all();
-        $preselect = $categories->where('slug',$cat)->first();
-        return view('postform')
-            ->with([
-                'formtitle' => 'New Post',
-                'categories' => $categories,
-                'preselect' => $preselect
+        return view("postform", compact("categories", "category"));
+    }
+
+    // Delete a post
+    public function destroy(Category $category, $postslug)
+    {
+        $post = Post::where("slug", $postslug)
+            ->where("category_id", $category->id)
+            ->firstOrFail();
+        $post->delete();
+
+        return redirect()->route("home")->with("success", "Post deleted.");
+    }
+
+    // INSERT:
+    //
+    //
+    public function store(Request $request, Category $category)
+    {
+        $data = $request->validate([
+            "title" => "required|string",
+            "slug" => "required|string|unique:posts,slug",
+            "subtitle" => "nullable|string",
+            "content" => "nullable|string",
+            "category_id" => "nullable|exists:categories,id",
+            "new_category_name" => "nullable|string",
+        ]);
+
+        // Handle new category creation
+        if (empty($data["category_id"]) && !empty($data["new_category_name"])) {
+            $newCategory = Category::create([
+                "name" => $data["new_category_name"],
+                "slug" => \Str::slug($data["new_category_name"]),
             ]);
-    }
-
-
-    private function _slugit($string)
-    {
-        $temp = Str::slug($string, '-');
-        // search for existing slug
-        if (Post::where('slug', $temp)->first()) {
-            $count = 1;
-            $slug = $temp."-".$count;
-            while (Post::where('slug', $slug)->first()) {
-                $count++;
-                $slug = $temp."-".$count;
-            }
-            // dd($slug);
-            return $slug;
-        } else {
-            return $temp;
+            $data["category_id"] = $newCategory->id;
         }
+
+        $post = new Post();
+        $post->title = $data["title"];
+        $post->slug = $data["slug"];
+        $post->subtitle = $data["subtitle"] ?? "";
+        $post->content = $data["content"] ?? "";
+        $post->category_id = $data["category_id"] ?? $category->id;
+        $post->save();
+
+        return redirect()
+            ->route("posts.show", [$post->category->slug, $post->slug])
+            ->with("success", "Post created successfully!");
     }
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store($category, Request $request)
+
+    public function update(Request $request, Category $category, $postslug)
     {
-        $this->validate($request, [
-            'title' => 'required',
-            'content' => 'required'
+        // Find the post by slug and original category
+        $post = Post::where("slug", $postslug)
+            ->where("category_id", $category->id)
+            ->firstOrFail();
+
+        // Validate incoming request
+        $data = $request->validate([
+            "title" => "required|string",
+            "slug" => "required|string|unique:posts,slug," . $post->id,
+            "subtitle" => "nullable|string",
+            "content" => "nullable|string",
+            "category_id" => "required|exists:categories,id",
         ]);
 
-        Post::create([
-            'category_id' => $request->select_category, // $request->category_id
-            'title' => $request->title,
-            'slug' => $this->_slugit($request->title),
-            'subtitle' => $request->subtitle,
-            'content' => $request->get('content'),
+        // Update all fields, including category_id
+        $post->update([
+            "title" => $request->input("title"),
+            "slug" => $request->input("slug"),
+            "subtitle" => $request->input("subtitle", ""),
+            "content" => $request->input("content", ""),
+            "category_id" => $request->input("category_id"), // <--- this is key
         ]);
 
-        return redirect("/".$category); // to the category road
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($categoryslug, $postslug)
-    {
-        if ($post = Post::where('slug', $postslug)->first()) {
-            return view('postform')
-                ->with(['postslug' => $postslug])
-                ->with(['title' => $post['title']])
-                ->with(['subtitle' => $post['subtitle']])
-                ->with(['content' => $post['content']])
-                ->with(['formtitle' => "Edit: " . $post['title']])
-                ->with(['categories' => $post['category'], 'preselect' => $post['category']]);
-        } else {
-            return abort(404);
-        }
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $categoryslug, $postslug)
-    {
-        $this->validate($request, [
-            'title' => 'required',
-            'content' => 'required'
-        ]);
-
-        if ($post = Post::where('slug', $postslug)->first()) {
-            $updatePost = Post::find($post['id']);
-            $updatePost->category_id = $request->select_category;
-            $updatePost->title = $request->get('title');
-            $updatePost->subtitle = $request->get('subtitle');
-            $updatePost->content = $request->get('content');
-            $updatePost->save();
-            return redirect("/".$categoryslug);
-        } else {
-            return abort(404);
-        }
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy($categoryslug, $postslug)
-    {
-        if ($post = Post::where('slug', $postslug)->first()) {
-            Post::destroy($post['id']);
-            return redirect("/".$categoryslug);
-        } else {
-            return abort(404);
-        }
+        return redirect()
+            ->route("posts.show", [$post->category->slug, $post->slug])
+            ->with("success", "Post updated successfully!");
     }
 }

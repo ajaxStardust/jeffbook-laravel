@@ -7,19 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 class Post extends Model
 {
     // Allow mass assignment for these fields
-    protected $fillable = [
-        'category',
-        'title',
-        'slug',
-        'subtitle',
-        'content'
-    ];
+    protected $fillable = ["category", "title", "slug", "subtitle", "content"];
 
     // Optional default values
     protected $attributes = [
-        'subtitle' => '',
-        'content' => '',
+        "subtitle" => "",
+        "content" => "",
     ];
 
     // No constructor needed — Eloquent handles instantiation
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
 }
