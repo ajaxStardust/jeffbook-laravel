@@ -12,3 +12,16 @@ Homestead.yaml
 npm-debug.log
 yarn-error.log
 /.idea
+
+# Ignore compiled framework files
+/bootstrap/cache/*.php
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore composer cache (optional, sometimes included in CI)
+~/.composer/cache
+
+# Ignore log files
+/storage/logs/*.log

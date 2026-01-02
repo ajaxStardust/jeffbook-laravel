@@ -2,8 +2,9 @@
 
 namespace App\Providers;
 
-use App\Models\Category;
 use Illuminate\Support\ServiceProvider;
+use App\Models\Category;
+use App\Repository\PostRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -14,8 +15,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        view()->composer('*', function($view) {
-            $view->with('categories', Category::get());
+        // Bind the PostRepository as a singleton if needed
+        $this->app->singleton(PostRepository::class, function ($app) {
+            return new PostRepository();
         });
     }
 
@@ -26,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        //
+        // Safely share categories with all views
+        view()->composer('*', function ($view) {
+            // Pull real categories from database
+            $categories = Category::all();
+            $view->with('categories', $categories);
+        });
+
     }
 }
